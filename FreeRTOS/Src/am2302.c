@@ -44,11 +44,10 @@ am2302_data am2302_get (void) {
   int T = 0;
   am2302_data result;
   char i=0;
-  char am2302_timeout = 0;        // Флаг таймаута ответа от AM2302
+  char am2302_timeout = 0;
 
-  HAL_GPIO_WritePin (AM2302_PORT, AM2302_PIN, GPIO_PIN_RESET);  //SDA = 0
-  HAL_Delay (1);                                                //1ms
-  /*
+  HAL_GPIO_WritePin (AM2302_PORT, AM2302_PIN, GPIO_PIN_RESET);  // SDA = 0
+  HAL_Delay (1);                                                // 1ms
 
   __HAL_TIM_CLEAR_FLAG(&htim16, TIM_FLAG_UPDATE);                // Очистка флага прерывания
   
@@ -60,18 +59,30 @@ am2302_data am2302_get (void) {
 */   
   HAL_GPIO_WritePin (AM2302_PORT, AM2302_PIN, GPIO_PIN_SET);    // SDA = 1
   
-  HAL_TIM_Base_Start_IT (&htim16);                                // Запуск таймаута 1мс
+  HAL_TIM_Base_Start_IT (&htim16);   // Run timeout 1us
   
   while ((HAL_GPIO_ReadPin(AM2302_SDA_GPIO_Port, AM2302_SDA_Pin) == 1) ||
-         (AM2302_TimeOut == 0)) {    // Wait SDA->0 or am2302_timout
+         (am2302_timeout == 0)) {    // Wait SDA->0 or am2302_timout
   }
-  if (AM2302_TimeOut) { // Если ответа не последовало
-    return 0;
+  if (am2302_timeout) {
+    result.hum = 0;
+    result.tmpr = 0;
+    result.paritet = 0;
+    return result;
+  } else {
+    __HAL_TIM_CLEAR_FLAG (&htim16, TIM_FLAG_UPDATE); // Run timeout 1us
+  }
+
+  while ((HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 0) ||
+        (am2302_timeout == 0)) {     // Wait SDA->1 or am2302_timout
+  }
+  if (AM2302_TimeOut) {
+    result.hum = 0;
+    result.tmpr = 0;
+    result.paritet = 0;
+    return result;
   } else {
     __HAL_TIM_CLEAR_FLAG(&htim16, TIM_FLAG_UPDATE);
-    // Вернуть значение 0
-  HAL_TIM_Base_Stop_IT(&htim16);*/
-  while (HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 0) {     // Ждем когда AM2302 установит 1
   }
   while (HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 1) {     // Ждем когда AM2302 установит 0
   }
