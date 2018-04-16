@@ -1,0 +1,14 @@
+*.*
+!*.py
+!*.bat
+!*.html
+!*.js
+!*.json
+!*.gitignore
+!*.c
+!*.h
+!*.cpp
+!*.hpp
+!*.cc
+!*.hh
+!*.ioc
