@@ -43,6 +43,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "hd44780.h"
+#include "am2302.h"
 
 /* USER CODE END Includes */
 
@@ -53,7 +54,7 @@ RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
 
-TIM_HandleTypeDef htim16;
+TIM_HandleTypeDef htim6;
 
 PCD_HandleTypeDef hpcd_USB_FS;
 
@@ -69,7 +70,7 @@ static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_RTC_Init(void);
-static void MX_TIM16_Init(void);
+static void MX_TIM6_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -91,6 +92,12 @@ static void MX_TIM16_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+  
+  const char symbol[8]={0x06,0x09,0x09,0x06,0x00,0x00,0x00,0x00};
+  am2302_data hum_tmpr;
+  hum_tmpr.hum = 0;
+  hum_tmpr.tmpr = 0;
+  hum_tmpr.paritet = 0;
 
   /* USER CODE END 1 */
 
@@ -116,12 +123,24 @@ int main(void)
   MX_SPI1_Init();
   MX_USB_PCD_Init();
   MX_RTC_Init();
-  MX_TIM16_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
   
-  hd44780_init();
-  hd44780_string ("ПриВет, туПица!", 0);
-
+  hd44780_init ();
+  hd44780_user_symbol (0x00, symbol);
+//  hd44780_string ("ПриВет, туПица!", 5);
+//  HAL_Delay (500);
+  hd44780_clr ();
+  hd44780_string ("Иниц-я дисплея", 5);
+  hd44780_xy (1, 2);
+  hd44780_string ("прошла успешно", 5);
+  HAL_Delay (500);
+  
+  am2302_init ();
+  
+  hd44780_clr ();
+//  hd44780_string ();
+ 
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -129,6 +148,37 @@ int main(void)
   while (1)
   {
 
+//    TEMP = hum_tmpr.tmpr;
+//    HUM = hum_tmpr.hum;
+    hum_tmpr = am2302_get ();
+    
+    if ((hum_tmpr.hum == 0) && (hum_tmpr.tmpr == 0)) {
+      hd44780_clr ();
+      hd44780_string ("   нет ответа", 0);
+      hd44780_xy (1, 2);
+      hd44780_string ("   от датчика", 0);
+    } else {
+      hd44780_clr ();
+//      hd44780_string ("Температура",0);
+//      hd44780_xy(1,2);
+//      hd44780_string ("Влажность",0);
+      hd44780_xy(13,1);
+      hd44780_send(0x2C, DAT);
+      hd44780_send((hum_tmpr.tmpr%10)|0x30, DAT);
+      hd44780_send(0x00, DAT);
+      hd44780_send(0x43, DAT);
+      hd44780_xy(12,1);
+      hd44780_num(hum_tmpr.tmpr/10);
+
+      hd44780_xy(14,2);
+      hd44780_send(0x2C, DAT);
+      hd44780_send((hum_tmpr.hum%10)|0x30, DAT);
+      hd44780_send(0x25, DAT);
+      hd44780_xy(13,2);
+      hd44780_num(hum_tmpr.hum/10);
+    }
+    HAL_Delay (2000);
+    
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
@@ -317,18 +367,25 @@ static void MX_SPI1_Init(void)
 
 }
 
-/* TIM16 init function */
-static void MX_TIM16_Init(void)
+/* TIM6 init function */
+static void MX_TIM6_Init(void)
 {
 
-  htim16.Instance = TIM16;
-  htim16.Init.Prescaler = 0;
-  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 0;
-  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim16.Init.RepetitionCounter = 0;
-  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  TIM_MasterConfigTypeDef sMasterConfig;
+
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 0;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 0;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    _Error_Handler(__FILE__, __LINE__);
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
@@ -377,10 +434,8 @@ static void MX_GPIO_Init(void)
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin 
                           |LD6_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin 
-                           MEMS_INT2_Pin */
-  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT1_Pin 
-                          |MEMS_INT2_Pin;
+  /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT2_Pin */
+  GPIO_InitStruct.Pin = DRDY_Pin|MEMS_INT3_Pin|MEMS_INT4_Pin|MEMS_INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
@@ -396,11 +451,21 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : B1_Pin */
-  GPIO_InitStruct.Pin = B1_Pin;
+  /*Configure GPIO pin : AM2302_PIN_Pin */
+  GPIO_InitStruct.Pin = AM2302_PIN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(AM2302_PIN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Button_Pin */
+  GPIO_InitStruct.Pin = Button_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
 }
 

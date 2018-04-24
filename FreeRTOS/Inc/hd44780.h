@@ -28,7 +28,7 @@ void hd44780_xy (char x, char y);            // ‘ункци€ установки курсора в пози
 void hd44780_string (char string[], int ms); // ‘ункци€ вывода на экран строки STRING, после вывода каждого символа происходит задержка MS миллисекунд
 void hd44780_conf (display_type display, cursor_type cursor, blink_type blink);   // ‘ункци€ настройки курсора диспле€: ON/OFF - включение/выключение диспле€,
                                                                         // CURSOR/NO_CURSOR - курсор в виде нижнего подчеркивани€, BLINK/NO_BLINK - мигание/не мигание знакоместа
-void hd44780_set_symbol (char adr, char SYMBOL[8]);  // ‘ункци€ записи пользовательского символа 5х8: ADR - адрес €чейки CGRAM, SYMBOL - массив из 8 строк вида char SYMBOL[8]={
+void hd44780_user_symbol (char adr, const char symbol[8]);  // ‘ункци€ записи пользовательского символа 5х8: ADR - адрес €чейки CGRAM, SYMBOL - массив из 8 строк вида char SYMBOL[8]={
                                                 // 0b000XXXXX,          
                                                 // 0b000XXXXX,
                                                 // 0b000XXXXX,

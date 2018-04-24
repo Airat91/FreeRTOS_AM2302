@@ -15,7 +15,7 @@ typedef struct {
   char paritet;
 } am2302_data;
 
-extern char am2302_timeout;
+volatile extern char am2302_timeout;
 
 //========== FUNCTIONS PROTOTYPES ==========
 

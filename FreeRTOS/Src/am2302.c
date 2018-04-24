@@ -2,9 +2,10 @@
 
 #define AM2302_PIN  GPIO_PIN_13
 #define AM2302_PORT GPIOC
-#define AM2302_TIMER TIM16
+#define AM2302_TIMER TIM6
 
-#define AM2302_TIMER_CLK = 72000000;
+const int AM2302_TIMER_CLK = 72000000;
+volatile char am2302_timeout = 0;
 
 void am2302_init (void) {
   if (AM2302_PORT == GPIOA) {
@@ -27,89 +28,212 @@ void am2302_init (void) {
   GPIO_InitStruct.Pin = AM2302_PIN;
   HAL_GPIO_Init (AM2302_PORT, &GPIO_InitStruct);
   
-  htim16.Instance = AM2302_TIMER;
-  htim16.Init.Prescaler = (AM2302_TIMER_CLK / 2000000 - 1); //  2 MHz
-  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 2000;                                // timeout = 1 ms
-  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim16.Init.RepetitionCounter = 0;
-  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  TIM_HandleTypeDef htim;
+  htim.Instance = AM2302_TIMER;
+  htim.Init.Prescaler = (AM2302_TIMER_CLK / 20000000 - 1); //  2 MHz
+  htim.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim.Init.Period = 20000;                                // timeout = 1 ms
+  htim.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim.Init.RepetitionCounter = 0;
+  htim.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim) != HAL_OK)
   {
     _Error_Handler(__FILE__, __LINE__);
   }
 }
   
 am2302_data am2302_get (void) {
-  int T = 0;
-  am2302_data result;
-  char i=0;
-  char am2302_timeout = 0;
-
-  HAL_GPIO_WritePin (AM2302_PORT, AM2302_PIN, GPIO_PIN_RESET);  // SDA = 0
-  HAL_Delay (1);                                                // 1ms
-
-  __HAL_TIM_CLEAR_FLAG(&htim16, TIM_FLAG_UPDATE);                // Очистка флага прерывания
-  
-  HAL_TIM_Base_Start(&htim16);                                   // Запуск таймера
-  while(__HAL_TIM_GET_FLAG(&htim16, TIM_FLAG_UPDATE)==0)         // Ждем пока установится флаг прерывания
-  {                                                              // SDA=0 1 мс
-  }
-  HAL_TIM_Base_Stop(&htim16);                                    // Останавливаем таймер
-*/   
-  HAL_GPIO_WritePin (AM2302_PORT, AM2302_PIN, GPIO_PIN_SET);    // SDA = 1
-  
-  HAL_TIM_Base_Start_IT (&htim16);   // Run timeout 1us
-  
-  while ((HAL_GPIO_ReadPin(AM2302_SDA_GPIO_Port, AM2302_SDA_Pin) == 1) ||
-         (am2302_timeout == 0)) {    // Wait SDA->0 or am2302_timout
-  }
-  if (am2302_timeout) {
-    result.hum = 0;
-    result.tmpr = 0;
-    result.paritet = 0;
-    return result;
-  } else {
-    __HAL_TIM_CLEAR_FLAG (&htim16, TIM_FLAG_UPDATE); // Run timeout 1us
-  }
-
-  while ((HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 0) ||
-        (am2302_timeout == 0)) {     // Wait SDA->1 or am2302_timout
-  }
-  if (AM2302_TimeOut) {
-    result.hum = 0;
-    result.tmpr = 0;
-    result.paritet = 0;
-    return result;
-  } else {
-    __HAL_TIM_CLEAR_FLAG(&htim16, TIM_FLAG_UPDATE);
-  }
-  while (HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 1) {     // Ждем когда AM2302 установит 0
-  }
-  
-  while(i<32)
-  {
-    htim16.Instance->CNT = 0;                                             // Обнуляем счетчик 
-    HAL_TIM_Base_Start(&htim16);                                          // Запуск таймера
-    while (HAL_GPIO_ReadPin(AM2302_SDA_GPIO_Port, AM2302_SDA_Pin)==0)     // Ждем когда AM2302 установит 1
-    {
-    }
-    HAL_TIM_Base_Stop(&htim16);                                           // Останавливаем таймер
-    T = htim16.Instance->CNT;                                             // Запоминаем длительность лог 0 AM2302
-    htim16.Instance->CNT = 0;                                             // Обнуляем счетчик 
-    HAL_TIM_Base_Start(&htim16);                                          // Запуск таймера
-    while (HAL_GPIO_ReadPin(AM2302_SDA_GPIO_Port, AM2302_SDA_Pin)==1)     // Ждем когда AM2302 установит 0
-    {
-    }
-    HAL_TIM_Base_Stop(&htim16);                                           // Останавливаем таймер
     
-    RESULT=(RESULT<<1);
-    i++;
-    if (htim16.Instance->CNT>T)
-      RESULT++;
-  }
+    am2302_data result;
+    result.hum = 0;
+    result.tmpr = 0;
+    result.paritet = 0;
+    int T = 0;
+    char i = 0;
+    am2302_timeout = 0;
+    TIM_HandleTypeDef htim;
+    htim.Instance = AM2302_TIMER;
+    
+    GPIO_InitTypeDef GPIO_InitStruct;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Pin = AM2302_PIN;
+    HAL_GPIO_Init (AM2302_PORT, &GPIO_InitStruct);
+
+    HAL_GPIO_WritePin (AM2302_PORT, AM2302_PIN, GPIO_PIN_RESET);  // SDA = 0
+    HAL_Delay (1);                                                // 1ms 
+    
+//    __HAL_TIM_CLEAR_FLAG (&htim, TIM_FLAG_UPDATE);
+//    HAL_TIM_Base_Start_IT (&htim);   // Run timeout 1us
+//    while (am2302_timeout == 0) {
+//    }
+//    htim.Instance->CNT = 0;
+//    am2302_timeout = 0;
+    
+    HAL_GPIO_WritePin (AM2302_PORT, AM2302_PIN, GPIO_PIN_SET);    // SDA = 1
+    
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    HAL_GPIO_Init (AM2302_PORT, &GPIO_InitStruct);
+    
+    __HAL_TIM_CLEAR_FLAG (&htim, TIM_FLAG_UPDATE);
+    HAL_TIM_Base_Start_IT (&htim);   // Run timeout 1us
   
+    while ((HAL_GPIO_ReadPin(AM2302_PORT, AM2302_PIN) == 1) &&
+        (am2302_timeout == 0)) {    // Wait SDA->0 or am2302_timeout     
+    }
+    if (am2302_timeout) {
+        result.hum = 0;
+        result.tmpr = 0;
+        result.paritet = 0;
+        return result;
+    } else {
+        htim.Instance->CNT = 0; // Reset timeout
+    }
+
+    while ((HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 0) &&
+        (am2302_timeout == 0)) {     // Wait SDA->1 or am2302_timeout
+    }
+    if (am2302_timeout) {
+        result.hum = 0;
+        result.tmpr = 0;
+        result.paritet = 0;
+        return result;
+    } else {
+        htim.Instance->CNT = 0; // Reset timeout
+    }
   
-  i=0;
-  return RESULT;
+    while ((HAL_GPIO_ReadPin(AM2302_PORT, AM2302_PIN) == 1) &&
+        (am2302_timeout == 0)) {    // Wait SDA->0 or am2302_timeout
+    }
+    if (am2302_timeout) {
+        result.hum = 0;
+        result.tmpr = 0;
+        result.paritet = 0;
+        return result;
+    } else {
+        htim.Instance->CNT = 0; // Reset timeout
+    }
+  
+    while(i<16) {   //Read hummidity
+        htim.Instance->CNT = 0;
+        HAL_TIM_Base_Start(&htim);
+        
+        while ((HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 0) &&
+            (am2302_timeout == 0)) {     // Wait SDA->1 or am2302_timeout
+        }
+        if (am2302_timeout) {
+            result.hum = 0;
+            result.tmpr = 0;
+            result.paritet = 0;
+            return result;
+        } else {
+            HAL_TIM_Base_Stop (&htim);
+            T = htim.Instance -> CNT;
+            htim.Instance -> CNT = 0;
+            HAL_TIM_Base_Start (&htim);
+        }
+    
+        while ((HAL_GPIO_ReadPin(AM2302_PORT, AM2302_PIN) == 1) &&
+            (am2302_timeout == 0)) {    // Wait SDA->0 or am2302_timeout
+        }
+        if (am2302_timeout) {
+            result.hum = 0;
+            result.tmpr = 0;
+            result.paritet = 0;
+            return result;
+        } else {
+            HAL_TIM_Base_Stop(&htim);
+            result.hum = (result.hum << 1);
+            i++;
+            if (htim.Instance -> CNT > T) {
+                result.hum++;
+            }
+        }
+    }
+    i = 0;
+    while(i<16) {   //Read temperature
+        htim.Instance->CNT = 0;
+        HAL_TIM_Base_Start(&htim);
+        
+        while ((HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 0) &&
+            (am2302_timeout == 0)) {     // Wait SDA->1 or am2302_timeout
+        }
+        if (am2302_timeout) {
+            result.hum = 0;
+            result.tmpr = 0;
+            result.paritet = 0;
+            return result;
+        } else {
+            HAL_TIM_Base_Stop (&htim);
+            T = htim.Instance -> CNT;
+            htim.Instance -> CNT = 0;
+            HAL_TIM_Base_Start (&htim);
+        }
+    
+        while ((HAL_GPIO_ReadPin(AM2302_PORT, AM2302_PIN) == 1) &&
+            (am2302_timeout == 0)) {    // Wait SDA->0 or am2302_timeout
+        }
+        if (am2302_timeout) {
+            result.hum = 0;
+            result.tmpr = 0;
+            result.paritet = 0;
+            return result;
+        } else {
+            HAL_TIM_Base_Stop(&htim);
+            result.tmpr = (result.tmpr << 1);
+            i++;
+            if (htim.Instance -> CNT > T) {
+                result.tmpr++;
+            }
+        }
+    }
+    i = 0;
+    while(i<8) {   //Read paritet
+        htim.Instance->CNT = 0;
+        HAL_TIM_Base_Start(&htim);
+        
+        while ((HAL_GPIO_ReadPin (AM2302_PORT, AM2302_PIN) == 0) &&
+            (am2302_timeout == 0)) {     // Wait SDA->1 or am2302_timeout
+        }
+        if (am2302_timeout) {
+            result.hum = 0;
+            result.tmpr = 0;
+            result.paritet = 0;
+            return result;
+        } else {
+            HAL_TIM_Base_Stop (&htim);
+            T = htim.Instance -> CNT;
+            htim.Instance -> CNT = 0;
+            HAL_TIM_Base_Start (&htim);
+        }
+    
+        while ((HAL_GPIO_ReadPin(AM2302_PORT, AM2302_PIN) == 1) &&
+            (am2302_timeout == 0)) {    // Wait SDA->0 or am2302_timeout
+        }
+        if (am2302_timeout) {
+            result.hum = 0;
+            result.tmpr = 0;
+            result.paritet = 0;
+            return result;
+        } else {
+            HAL_TIM_Base_Stop(&htim);
+            result.paritet = (result.paritet << 1);
+            i++;
+            if (htim.Instance -> CNT > T) {
+                result.paritet++;
+            }
+        }
+    }
+    
+    result.paritet -= (result.hum >> 8);
+    result.paritet -= result.hum;
+    result.paritet -= (result.tmpr >> 8);
+    result.paritet -= result.tmpr;
+    if (result.paritet) {
+        result.hum = 0;
+        result.tmpr = 0;
+        result.paritet = 0;
+    }
+    return result;
 }

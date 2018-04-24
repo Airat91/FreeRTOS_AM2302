@@ -254,7 +254,7 @@ void hd44780_string (char string[], int ms) {
   }
 }
 
-void hd44780_user_symbol (char adr, char const symbol[8]) {
+void hd44780_user_symbol (char adr, const char symbol[8]) {
   adr = (adr << 3) | 0x40;
   for (char i=0; i<8; i++) {
     hd44780_send ((adr + i), CMD);
