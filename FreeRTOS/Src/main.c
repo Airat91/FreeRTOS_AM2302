@@ -98,6 +98,9 @@ int main(void)
   hum_tmpr.hum = 0;
   hum_tmpr.tmpr = 0;
   hum_tmpr.paritet = 0;
+  typedef enum {OK, ERROR} status_type;
+  status_type cur_state;
+  status_type last_state;  
 
   /* USER CODE END 1 */
 
@@ -128,12 +131,10 @@ int main(void)
   
   hd44780_init ();
   hd44780_user_symbol (0x00, symbol);
-//  hd44780_string ("ПриВет, туПица!", 5);
-//  HAL_Delay (500);
   hd44780_clr ();
-  hd44780_string ("Иниц-я дисплея", 5);
+  hd44780_string (" Иниц-я дисплея", 5);
   hd44780_xy (1, 2);
-  hd44780_string ("прошла успешно", 5);
+  hd44780_string (" прошла успешно", 5);
   HAL_Delay (500);
   
   am2302_init ();
@@ -147,21 +148,22 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
-//    TEMP = hum_tmpr.tmpr;
-//    HUM = hum_tmpr.hum;
     hum_tmpr = am2302_get ();
     
     if ((hum_tmpr.hum == 0) && (hum_tmpr.tmpr == 0)) {
-      hd44780_clr ();
+      cur_state = ERROR;
+      if (cur_state != last_state) {
+        hd44780_clr ();
+      }
       hd44780_string ("   нет ответа", 0);
       hd44780_xy (1, 2);
       hd44780_string ("   от датчика", 0);
+      last_state = ERROR;
     } else {
-      hd44780_clr ();
-//      hd44780_string ("Температура",0);
-//      hd44780_xy(1,2);
-//      hd44780_string ("Влажность",0);
+      cur_state = OK;
+      if (cur_state != last_state) {
+        hd44780_clr ();
+      }
       hd44780_xy(13,1);
       hd44780_send(0x2C, DAT);
       hd44780_send((hum_tmpr.tmpr%10)|0x30, DAT);
@@ -176,7 +178,9 @@ int main(void)
       hd44780_send(0x25, DAT);
       hd44780_xy(13,2);
       hd44780_num(hum_tmpr.hum/10);
+      last_state = OK;
     }
+    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
     HAL_Delay (2000);
     
   /* USER CODE END WHILE */

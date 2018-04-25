@@ -136,9 +136,8 @@ void TIM6_DAC_IRQHandler(void)
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
 
-//  HAL_TIM_Base_Stop_IT(&htim6);
+  HAL_TIM_Base_Stop_IT(&htim6);
   am2302_timeout = 1;
-  HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
   
   /* USER CODE END TIM6_DAC_IRQn 1 */
 }
