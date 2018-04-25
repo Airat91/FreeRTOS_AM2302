@@ -4,46 +4,59 @@
   * @file           : main.c
   * @brief          : Main program body
   ******************************************************************************
-  ** This notice applies to any and all portions of this file
+  * This notice applies to any and all portions of this file
   * that are not between comment pairs USER CODE BEGIN and
   * USER CODE END. Other portions of this file, whether 
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * COPYRIGHT(c) 2018 STMicroelectronics
+  * Copyright (c) 2018 STMicroelectronics International N.V. 
+  * All rights reserved.
   *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
+  * Redistribution and use in source and binary forms, with or without 
+  * modification, are permitted, provided that the following conditions are met:
   *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  * 1. Redistribution of source code must retain the above copyright notice, 
+  *    this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright notice,
+  *    this list of conditions and the following disclaimer in the documentation
+  *    and/or other materials provided with the distribution.
+  * 3. Neither the name of STMicroelectronics nor the names of other 
+  *    contributors to this software may be used to endorse or promote products 
+  *    derived from this software without specific written permission.
+  * 4. This software, including modifications and/or derivative works of this 
+  *    software, must execute solely and exclusively on microcontroller or
+  *    microprocessor devices manufactured by or for STMicroelectronics.
+  * 5. Redistribution and use of this software other than as permitted under 
+  *    this license is void and will automatically terminate your rights under 
+  *    this license. 
+  *
+  * THIS SOFTWARE IS PROVIDED BY STMICROELECTRONICS AND CONTRIBUTORS "AS IS" 
+  * AND ANY EXPRESS, IMPLIED OR STATUTORY WARRANTIES, INCLUDING, BUT NOT 
+  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+  * PARTICULAR PURPOSE AND NON-INFRINGEMENT OF THIRD PARTY INTELLECTUAL PROPERTY
+  * RIGHTS ARE DISCLAIMED TO THE FULLEST EXTENT PERMITTED BY LAW. IN NO EVENT 
+  * SHALL STMICROELECTRONICS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
+  * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
+  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   *
   ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f3xx_hal.h"
+#include "cmsis_os.h"
 
 /* USER CODE BEGIN Includes */
 
 #include "hd44780.h"
 #include "am2302.h"
+#include "stdint.h"
+//#include "arm_math.h"
 
 /* USER CODE END Includes */
 
@@ -58,6 +71,11 @@ TIM_HandleTypeDef htim6;
 
 PCD_HandleTypeDef hpcd_USB_FS;
 
+osThreadId Task_am2302Handle;
+osThreadId Task_RTC_printHandle;
+osThreadId myTask03Handle;
+osSemaphoreId hd44780_SemHandle;
+
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 
@@ -71,6 +89,9 @@ static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM6_Init(void);
+void StartDefaultTask(void const * argument);
+void StartTask02(void const * argument);
+void StartTask03(void const * argument);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -93,14 +114,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   
-  const char symbol[8]={0x06,0x09,0x09,0x06,0x00,0x00,0x00,0x00};
-  am2302_data hum_tmpr;
-  hum_tmpr.hum = 0;
-  hum_tmpr.tmpr = 0;
-  hum_tmpr.paritet = 0;
-  typedef enum {OK, ERROR} status_type;
-  status_type cur_state;
-  status_type last_state;  
+  const char symbol[8]={0x06,0x09,0x09,0x06,0x00,0x00,0x00,0x00}; 
 
   /* USER CODE END 1 */
 
@@ -144,44 +158,55 @@ int main(void)
  
   /* USER CODE END 2 */
 
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* definition and creation of hd44780_Sem */
+  osSemaphoreDef(hd44780_Sem);
+  hd44780_SemHandle = osSemaphoreCreate(osSemaphore(hd44780_Sem), 1);
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* Create the thread(s) */
+  /* definition and creation of Task_am2302 */
+  osThreadDef(Task_am2302, StartDefaultTask, osPriorityNormal, 0, 128);
+  Task_am2302Handle = osThreadCreate(osThread(Task_am2302), NULL);
+
+  /* definition and creation of Task_RTC_print */
+  osThreadDef(Task_RTC_print, StartTask02, osPriorityIdle, 0, 128);
+  Task_RTC_printHandle = osThreadCreate(osThread(Task_RTC_print), NULL);
+
+  /* definition and creation of myTask03 */
+  osThreadDef(myTask03, StartTask03, osPriorityIdle, 0, 128);
+  myTask03Handle = osThreadCreate(osThread(myTask03), NULL);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+ 
+
+  /* Start scheduler */
+  osKernelStart();
+  
+  /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    hum_tmpr = am2302_get ();
     
-    if ((hum_tmpr.hum == 0) && (hum_tmpr.tmpr == 0)) {
-      cur_state = ERROR;
-      if (cur_state != last_state) {
-        hd44780_clr ();
-      }
-      hd44780_string ("   нет ответа", 0);
-      hd44780_xy (1, 2);
-      hd44780_string ("   от датчика", 0);
-      last_state = ERROR;
-    } else {
-      cur_state = OK;
-      if (cur_state != last_state) {
-        hd44780_clr ();
-      }
-      hd44780_xy(13,1);
-      hd44780_send(0x2C, DAT);
-      hd44780_send((hum_tmpr.tmpr%10)|0x30, DAT);
-      hd44780_send(0x00, DAT);
-      hd44780_send(0x43, DAT);
-      hd44780_xy(12,1);
-      hd44780_num(hum_tmpr.tmpr/10);
-
-      hd44780_xy(14,2);
-      hd44780_send(0x2C, DAT);
-      hd44780_send((hum_tmpr.hum%10)|0x30, DAT);
-      hd44780_send(0x25, DAT);
-      hd44780_xy(13,2);
-      hd44780_num(hum_tmpr.hum/10);
-      last_state = OK;
-    }
-    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
-    HAL_Delay (2000);
     
   /* USER CODE END WHILE */
 
@@ -259,7 +284,7 @@ void SystemClock_Config(void)
   HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
 
   /* SysTick_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(SysTick_IRQn, 15, 0);
 }
 
 /* I2C1 init function */
@@ -468,7 +493,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
 }
@@ -476,6 +501,125 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/* StartDefaultTask function */
+void StartDefaultTask(void const * argument)
+{
+
+  /* USER CODE BEGIN 5 */
+  
+  char DATE[11];
+  char TIME[9];
+  
+  /* Infinite loop */
+  for(;;)
+  {  
+    RTC_HandleTypeDef hrtc;
+    RTC_TimeTypeDef sTime;
+    RTC_DateTypeDef sDate;
+    hrtc.Instance = RTC;
+
+    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+    DATE[0] = (sDate.Date/10)|0x30;       // Десятки даты
+    DATE[1] = (sDate.Date%10)|0x30;       // Единицы даты
+    DATE[2] = 0x2F;                       // Символ /
+    DATE[3] = (sDate.Month/10)|0x30;      // Десятки месяца
+    DATE[4] = (sDate.Month%10)|0x30;      // Единицы месяца
+    DATE[5] = 0x2F;                       // Символ /
+    DATE[6] = 0x32;                       // Символ 2
+    DATE[7] = 0x30;                       // Символ 0
+    DATE[8] = (sDate.Year/10)|0x30;       // Десятки года
+    DATE[9] = (sDate.Year%10)|0x30;       // Единицы года
+    DATE[10] = 0;
+
+    TIME[0] = (sTime.Hours/10)|0x30;      // Десятки часов
+    TIME[1] = (sTime.Hours%10)|0x30;      // Единицы часов
+    TIME[2] = 0x3A;                       // Символ :
+    TIME[3] = (sTime.Minutes/10)|0x30;    // Десятки минут
+    TIME[4] = (sTime.Minutes%10)|0x30;    // Единицы минут
+    TIME[5] = 0x3A;                        // Символ :
+    TIME[6] = (sTime.Seconds/10)|0x30;    // Десятки секунд
+    TIME[7] = (sTime.Seconds%10)|0x30;    // Единицы секунд
+    TIME[8] = 0;
+
+    if (hd44780_SemHandle != NULL) {
+        if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
+            hd44780_xy(1, 1);
+            hd44780_string (TIME, 0);
+            hd44780_xy(1, 2);
+            hd44780_string (DATE, 0);
+        }
+        osSemaphoreRelease(hd44780_SemHandle);
+    }
+
+    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_9);
+    osDelay(50); 
+  }
+  /* USER CODE END 5 */ 
+}
+
+/* StartTask02 function */
+void StartTask02(void const * argument)
+{
+  /* USER CODE BEGIN StartTask02 */
+  am2302_data hum_tmpr;
+  hum_tmpr.hum = 0;
+  hum_tmpr.tmpr = 0;
+  hum_tmpr.paritet = 0;
+  /* Infinite loop */
+  for(;;)
+  {
+    hum_tmpr = am2302_get ();
+    if (hd44780_SemHandle != NULL) {
+        if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
+            if ((hum_tmpr.hum == 0) && (hum_tmpr.tmpr == 0)) {
+              hd44780_xy (11,1);
+              hd44780_string ("AM2302", 0);
+              hd44780_xy (12, 2);
+              hd44780_string ("Error", 0);
+            } else {
+              hd44780_xy(13,1);
+              hd44780_send(0x2C, DAT);
+              hd44780_send((hum_tmpr.tmpr%10)|0x30, DAT);
+              hd44780_send(0x00, DAT);
+              hd44780_send(0x43, DAT);
+              hd44780_xy(12,1);
+              hd44780_num(hum_tmpr.tmpr/10);
+
+              hd44780_xy(14,2);
+              hd44780_send(0x2C, DAT);
+              hd44780_send((hum_tmpr.hum%10)|0x30, DAT);
+              hd44780_send(0x25, DAT);
+              hd44780_xy(13,2);
+              hd44780_num(hum_tmpr.hum/10);
+            }
+        }
+        osSemaphoreRelease(hd44780_SemHandle);
+    }
+    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
+    osDelay(1000);
+  }
+  /* USER CODE END StartTask02 */
+}
+
+/* StartTask03 function */
+void StartTask03(void const * argument)
+{
+  /* USER CODE BEGIN StartTask03 */
+  
+//  char DATE[9];
+//  char TIME[7];
+  
+  /* Infinite loop */
+  for(;;)
+  {
+    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_10);
+    osDelay(100); 
+  }
+  /* USER CODE END StartTask03 */
+}
 
 /**
   * @brief  Period elapsed callback in non blocking mode
