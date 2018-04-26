@@ -77,15 +77,17 @@ void EXTI0_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI0_IRQn 0 */
 
+  extern uint8_t clock_state;
+  
   /* USER CODE END EXTI0_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
   /* USER CODE BEGIN EXTI0_IRQn 1 */
   
   HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_13);
-//  HAL_GPIO_WritePin (GPIOE, GPIO_PIN_13, GPIO_PIN_SET);
-//  while (HAL_GPIO_ReadPin (GPIOA, GPIO_PIN_0) == 1) {
-//  }
-//  HAL_GPIO_WritePin (GPIOE, GPIO_PIN_13, GPIO_PIN_RESET);
+  clock_state ++;
+  if (clock_state == WRITE_RTC + 1) {
+    clock_state = RUN;
+  }
 
   /* USER CODE END EXTI0_IRQn 1 */
 }

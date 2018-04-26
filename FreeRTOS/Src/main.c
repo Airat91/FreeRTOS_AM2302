@@ -73,11 +73,13 @@ PCD_HandleTypeDef hpcd_USB_FS;
 
 osThreadId Task_am2302Handle;
 osThreadId Task_RTC_printHandle;
-osThreadId myTask03Handle;
+osThreadId Task_RTC_setHandle;
 osSemaphoreId hd44780_SemHandle;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+
+state_type clock_state = RUN;
 
 /* USER CODE END PV */
 
@@ -89,9 +91,9 @@ static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM6_Init(void);
-void StartDefaultTask(void const * argument);
-void StartTask02(void const * argument);
-void StartTask03(void const * argument);
+void StartTask_am2302(void const * argument);
+void StartTask_RTC_print(void const * argument);
+void StartTask_RTC_set(void const * argument);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -114,7 +116,7 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   
-  const char symbol[8]={0x06,0x09,0x09,0x06,0x00,0x00,0x00,0x00}; 
+  const uint8_t symbol[8]={0x06,0x09,0x09,0x06,0x00,0x00,0x00,0x00}; 
 
   /* USER CODE END 1 */
 
@@ -177,16 +179,16 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of Task_am2302 */
-  osThreadDef(Task_am2302, StartDefaultTask, osPriorityNormal, 0, 128);
+  osThreadDef(Task_am2302, StartTask_am2302, osPriorityNormal, 0, 128);
   Task_am2302Handle = osThreadCreate(osThread(Task_am2302), NULL);
 
   /* definition and creation of Task_RTC_print */
-  osThreadDef(Task_RTC_print, StartTask02, osPriorityIdle, 0, 128);
+  osThreadDef(Task_RTC_print, StartTask_RTC_print, osPriorityIdle, 0, 128);
   Task_RTC_printHandle = osThreadCreate(osThread(Task_RTC_print), NULL);
 
-  /* definition and creation of myTask03 */
-  osThreadDef(myTask03, StartTask03, osPriorityIdle, 0, 128);
-  myTask03Handle = osThreadCreate(osThread(myTask03), NULL);
+  /* definition and creation of Task_RTC_set */
+  osThreadDef(Task_RTC_set, StartTask_RTC_set, osPriorityIdle, 0, 128);
+  Task_RTC_setHandle = osThreadCreate(osThread(Task_RTC_set), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -502,75 +504,20 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* StartDefaultTask function */
-void StartDefaultTask(void const * argument)
+/* StartTask_am2302 function */
+void StartTask_am2302(void const * argument)
 {
 
   /* USER CODE BEGIN 5 */
   
-  char DATE[11];
-  char TIME[9];
-  
-  /* Infinite loop */
-  for(;;)
-  {  
-    RTC_HandleTypeDef hrtc;
-    RTC_TimeTypeDef sTime;
-    RTC_DateTypeDef sDate;
-    hrtc.Instance = RTC;
-
-    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-
-    DATE[0] = (sDate.Date/10)|0x30;       // Десятки даты
-    DATE[1] = (sDate.Date%10)|0x30;       // Единицы даты
-    DATE[2] = 0x2F;                       // Символ /
-    DATE[3] = (sDate.Month/10)|0x30;      // Десятки месяца
-    DATE[4] = (sDate.Month%10)|0x30;      // Единицы месяца
-    DATE[5] = 0x2F;                       // Символ /
-    DATE[6] = 0x32;                       // Символ 2
-    DATE[7] = 0x30;                       // Символ 0
-    DATE[8] = (sDate.Year/10)|0x30;       // Десятки года
-    DATE[9] = (sDate.Year%10)|0x30;       // Единицы года
-    DATE[10] = 0;
-
-    TIME[0] = (sTime.Hours/10)|0x30;      // Десятки часов
-    TIME[1] = (sTime.Hours%10)|0x30;      // Единицы часов
-    TIME[2] = 0x3A;                       // Символ :
-    TIME[3] = (sTime.Minutes/10)|0x30;    // Десятки минут
-    TIME[4] = (sTime.Minutes%10)|0x30;    // Единицы минут
-    TIME[5] = 0x3A;                        // Символ :
-    TIME[6] = (sTime.Seconds/10)|0x30;    // Десятки секунд
-    TIME[7] = (sTime.Seconds%10)|0x30;    // Единицы секунд
-    TIME[8] = 0;
-
-    if (hd44780_SemHandle != NULL) {
-        if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
-            hd44780_xy(1, 1);
-            hd44780_string (TIME, 0);
-            hd44780_xy(1, 2);
-            hd44780_string (DATE, 0);
-        }
-        osSemaphoreRelease(hd44780_SemHandle);
-    }
-
-    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_9);
-    osDelay(50); 
-  }
-  /* USER CODE END 5 */ 
-}
-
-/* StartTask02 function */
-void StartTask02(void const * argument)
-{
-  /* USER CODE BEGIN StartTask02 */
   am2302_data hum_tmpr;
   hum_tmpr.hum = 0;
   hum_tmpr.tmpr = 0;
   hum_tmpr.paritet = 0;
+  
   /* Infinite loop */
   for(;;)
-  {
+  {  
     hum_tmpr = am2302_get ();
     if (hd44780_SemHandle != NULL) {
         if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
@@ -601,24 +548,76 @@ void StartTask02(void const * argument)
     HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
     osDelay(1000);
   }
-  /* USER CODE END StartTask02 */
+  /* USER CODE END 5 */ 
 }
 
-/* StartTask03 function */
-void StartTask03(void const * argument)
+/* StartTask_RTC_print function */
+void StartTask_RTC_print(void const * argument)
 {
-  /* USER CODE BEGIN StartTask03 */
+  /* USER CODE BEGIN StartTask_RTC_print */
   
-//  char DATE[9];
-//  char TIME[7];
-  
+  uint8_t DATE[11];
+  uint8_t TIME[9];
+
   /* Infinite loop */
   for(;;)
   {
-    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_10);
-    osDelay(100); 
+    RTC_HandleTypeDef hrtc;
+    RTC_TimeTypeDef sTime;
+    RTC_DateTypeDef sDate;
+    hrtc.Instance = RTC;
+
+    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+    DATE[0] = (sDate.Date/10)|0x30;
+    DATE[1] = (sDate.Date%10)|0x30;
+    DATE[2] = 0x2F;                       // Symbol "/"
+    DATE[3] = (sDate.Month/10)|0x30;
+    DATE[4] = (sDate.Month%10)|0x30;
+    DATE[5] = 0x2F;                       // Symbol "/"
+    DATE[6] = 0x32;                       // Symbol "2"
+    DATE[7] = 0x30;                       // Symbol "0"
+    DATE[8] = (sDate.Year/10)|0x30;
+    DATE[9] = (sDate.Year%10)|0x30;
+    DATE[10] = 0;
+
+    TIME[0] = (sTime.Hours/10)|0x30;
+    TIME[1] = (sTime.Hours%10)|0x30;
+    TIME[2] = 0x3A;                       // Symbol ":"
+    TIME[3] = (sTime.Minutes/10)|0x30;
+    TIME[4] = (sTime.Minutes%10)|0x30;
+    TIME[5] = 0x3A;                       // Symbol ":"
+    TIME[6] = (sTime.Seconds/10)|0x30;
+    TIME[7] = (sTime.Seconds%10)|0x30;
+    TIME[8] = 0;
+
+    if (hd44780_SemHandle != NULL) {
+        if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
+            hd44780_xy(1, 1);
+            hd44780_string (TIME, 0);
+            hd44780_xy(1, 2);
+            hd44780_string (DATE, 0);
+        }
+        osSemaphoreRelease(hd44780_SemHandle);
+    }
+
+    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_9);
+    osDelay(50);
   }
-  /* USER CODE END StartTask03 */
+  /* USER CODE END StartTask_RTC_print */
+}
+
+/* StartTask_RTC_set function */
+void StartTask_RTC_set(void const * argument)
+{
+  /* USER CODE BEGIN StartTask_RTC_set */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTask_RTC_set */
 }
 
 /**

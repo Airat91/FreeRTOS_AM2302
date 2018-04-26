@@ -15,7 +15,7 @@
 #define D7      GPIO_PIN_7
 #define PORT_D7 GPIOD
 
-#define WAIT_TIKS(x)    for (char i = x; i > 0; i--) {};
+#define WAIT_TIKS(x)    for (uint8_t i = x; i > 0; i--) {};
 #define BIT(x)          (1 << x)
 
 void hd44780_data_bits_output (void) {
@@ -64,7 +64,7 @@ void hd44780_data_bits_output (void) {
   HAL_GPIO_Init (PORT_RS, &GPIO_InitStruct);
 }
 
-void hd44780_send (char data, char cmd_dat) {
+void hd44780_send (uint8_t data, cmd_dat_type cmd_dat) {
   
   HAL_GPIO_WritePin (PORT_E, E, GPIO_PIN_SET);          // E = 1
   HAL_GPIO_WritePin (PORT_RW, RW, GPIO_PIN_RESET);      // RW = 0
@@ -137,8 +137,8 @@ void hd44780_clr (void) {
   hd44780_send (0x02, CMD);
 }
 
-void hd44780_conf (display_type display, char cursor, char blink) {
-  char data = (0x08 + (display << 2) + (cursor << 1) + blink);  // data structure: 0b00001DCB
+void hd44780_conf (display_type display, cursor_type cursor, blink_type blink) {
+  uint8_t data = (0x08 + (display << 2) + (cursor << 1) + blink);  // data structure: 0b00001DCB
                                                                 // D = 1 Display is ON  / D = 0 Display is OFF
                                                                 // C = 1 Cursor is ON   / C = 0 Cursor is OFF
                                                                 // B = 1 Blinked is ON  / B = 0 Blinked is OFF
@@ -157,11 +157,11 @@ void hd44780_conf (display_type display, char cursor, char blink) {
   }*/
 }
 
-void hd44780_xy (char x, char y) {
+void hd44780_xy (uint8_t x, uint8_t y) {
 #if ((x > 16) || (y > 2))
 #error x > 16 or y > 2
 #endif
-  char adr = (x-1);
+  uint8_t adr = (x-1);
   if (y == 2) {
     adr += 0x40;
   }
@@ -169,9 +169,9 @@ void hd44780_xy (char x, char y) {
   hd44780_send (adr, CMD);
 }
 
-void hd44780_string (char string[], int ms) {
-  char i = 0;
-  const char SHRIFT[] = {
+void hd44780_string (uint8_t string[], uint16_t ms) {
+  uint8_t i = 0;
+  const uint8_t SHRIFT[] = {
 		0x41,	// 0xC0	ј 
 		0xA0,	// Ѕ
 		0x42,	// ¬
@@ -254,16 +254,16 @@ void hd44780_string (char string[], int ms) {
   }
 }
 
-void hd44780_user_symbol (char adr, const char symbol[8]) {
+void hd44780_user_symbol (uint8_t adr, const uint8_t symbol[8]) {
   adr = (adr << 3) | 0x40;
-  for (char i=0; i<8; i++) {
+  for (uint8_t i = 0; i < 8; i++) {
     hd44780_send ((adr + i), CMD);
     hd44780_send (symbol[i], DAT);
   }
   hd44780_send (0x80, CMD);
 }
 
-void Lhd44780_shift (char LEFT_RIGHT, char num, int ms) {
+void Lhd44780_shift (uint8_t LEFT_RIGHT, uint8_t num, uint16_t ms) {
   if (LEFT_RIGHT == LEFT) {
     while ( num > 0) {
       hd44780_send (0x18, CMD);
@@ -284,9 +284,9 @@ void Lhd44780_shift (char LEFT_RIGHT, char num, int ms) {
   }
 }
 
-void hd44780_num (signed int num) {
-  char sign = 1;    // 1 - положительное число, 0 -о трицательное число
-  char digit = 0;   // переменна€, котора€ будет содержать в себе цифру 0...9
+void hd44780_num (int32_t num) {
+  uint8_t sign = 1;    // 1 - положительное число, 0 -о трицательное число
+  uint8_t digit = 0;   // переменна€, котора€ будет содержать в себе цифру 0...9
   if (num < 0) {    // если число отрицательное
     sign = 0;       // устанавливаем соответствующий параметр sign
     num = num * -1; // делаем число положительным

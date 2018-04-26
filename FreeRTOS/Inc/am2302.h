@@ -10,14 +10,14 @@
 #include "stm32f3xx_hal.h"
 
 typedef struct {
-  int hum;
-  int tmpr;
-  char paritet;
+  int16_t hum;
+  int16_t tmpr;
+  uint8_t paritet;
 } am2302_data;
 
 //========== VARIABLES ==========
 
-volatile extern char am2302_timeout;
+volatile extern uint8_t am2302_timeout;
 
 //========== FUNCTIONS PROTOTYPES ==========
 

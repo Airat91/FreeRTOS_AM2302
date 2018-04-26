@@ -128,6 +128,9 @@
 
 /* USER CODE BEGIN Private defines */
 
+typedef enum    {RUN = 0, GET_TIME, SET_HOUR, SET_MIN, SET_SEC, SET_DAY,
+                SET_MONTH, SET_YEAR, WRITE_RTC} state_type;
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

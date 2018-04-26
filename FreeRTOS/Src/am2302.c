@@ -4,8 +4,8 @@
 #define AM2302_PORT GPIOC
 #define AM2302_TIMER TIM6
 
-const int AM2302_TIMER_CLK = 72000000;
-volatile char am2302_timeout = 0;
+const uint32_t AM2302_TIMER_CLK = 72000000;
+volatile uint8_t am2302_timeout = 0;
 
 void am2302_init (void) {
     if (AM2302_PORT == GPIOA) {
@@ -47,8 +47,8 @@ am2302_data am2302_get (void) {
     result.hum = 0;
     result.tmpr = 0;
     result.paritet = 0;
-    int T = 0;
-    char i = 0;
+    uint16_t T = 0;
+    uint8_t i = 0;
     am2302_timeout = 0;
     
     TIM_HandleTypeDef htim;
