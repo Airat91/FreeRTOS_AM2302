@@ -75,21 +75,20 @@ void SysTick_Handler(void)
 */
 void EXTI0_IRQHandler(void)
 {
-  /* USER CODE BEGIN EXTI0_IRQn 0 */
+    /* USER CODE BEGIN EXTI0_IRQn 0 */
 
-  extern uint8_t clock_state;
-  
-  /* USER CODE END EXTI0_IRQn 0 */
-  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
-  /* USER CODE BEGIN EXTI0_IRQn 1 */
-  
-  HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_13);
-  clock_state ++;
-  if (clock_state == WRITE_RTC + 1) {
-    clock_state = RUN;
-  }
+    extern uint8_t clock_state;
 
-  /* USER CODE END EXTI0_IRQn 1 */
+    /* USER CODE END EXTI0_IRQn 0 */
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
+    /* USER CODE BEGIN EXTI0_IRQn 1 */
+
+    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_13);
+    
+    if (clock_state == RUN) {
+        clock_state = GET_TIME;
+    }
+    /* USER CODE END EXTI0_IRQn 1 */
 }
 
 /**
@@ -113,7 +112,7 @@ void TIM6_DAC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
 
-  extern char am2302_timeout;
+  extern uint8_t am2302_timeout;
   
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);

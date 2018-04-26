@@ -56,6 +56,7 @@
 #include "hd44780.h"
 #include "am2302.h"
 #include "stdint.h"
+#include "keyboard.h"
 //#include "arm_math.h"
 
 /* USER CODE END Includes */
@@ -154,6 +155,7 @@ int main(void)
   HAL_Delay (500);
   
   am2302_init ();
+  keyboard_init ();
   
   hd44780_clr ();
 //  hd44780_string ();
@@ -179,7 +181,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of Task_am2302 */
-  osThreadDef(Task_am2302, StartTask_am2302, osPriorityNormal, 0, 128);
+  osThreadDef(Task_am2302, StartTask_am2302, osPriorityHigh, 0, 128);
   Task_am2302Handle = osThreadCreate(osThread(Task_am2302), NULL);
 
   /* definition and creation of Task_RTC_print */
@@ -508,116 +510,251 @@ static void MX_GPIO_Init(void)
 void StartTask_am2302(void const * argument)
 {
 
-  /* USER CODE BEGIN 5 */
-  
-  am2302_data hum_tmpr;
-  hum_tmpr.hum = 0;
-  hum_tmpr.tmpr = 0;
-  hum_tmpr.paritet = 0;
-  
-  /* Infinite loop */
-  for(;;)
-  {  
-    hum_tmpr = am2302_get ();
-    if (hd44780_SemHandle != NULL) {
-        if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
-            if ((hum_tmpr.hum == 0) && (hum_tmpr.tmpr == 0)) {
-              hd44780_xy (11,1);
-              hd44780_string ("AM2302", 0);
-              hd44780_xy (12, 2);
-              hd44780_string ("Error", 0);
-            } else {
-              hd44780_xy(13,1);
-              hd44780_send(0x2C, DAT);
-              hd44780_send((hum_tmpr.tmpr%10)|0x30, DAT);
-              hd44780_send(0x00, DAT);
-              hd44780_send(0x43, DAT);
-              hd44780_xy(12,1);
-              hd44780_num(hum_tmpr.tmpr/10);
+    /* USER CODE BEGIN 5 */
 
-              hd44780_xy(14,2);
-              hd44780_send(0x2C, DAT);
-              hd44780_send((hum_tmpr.hum%10)|0x30, DAT);
-              hd44780_send(0x25, DAT);
-              hd44780_xy(13,2);
-              hd44780_num(hum_tmpr.hum/10);
+    am2302_data hum_tmpr;
+    hum_tmpr.hum = 0;
+    hum_tmpr.tmpr = 0;
+    hum_tmpr.paritet = 0;
+
+    /* Infinite loop */
+    for(;;) {  
+        hum_tmpr = am2302_get ();
+        if (hd44780_SemHandle != NULL) {
+            if (osSemaphoreWait (hd44780_SemHandle , 5) == osOK) {
+                if ((hum_tmpr.hum == 0) && (hum_tmpr.tmpr == 0)) {
+                  hd44780_xy (11,1);
+                  hd44780_string ("AM2302", 0);
+                  hd44780_xy (12, 2);
+                  hd44780_string ("Error", 0);
+                } else {
+                  hd44780_xy (13,1);
+                  hd44780_send (0x2C, DAT);
+                  hd44780_send ((hum_tmpr.tmpr%10)|0x30, DAT);
+                  hd44780_send (0x00, DAT);
+                  hd44780_send (0x43, DAT);
+                  hd44780_xy (12,1);
+                  hd44780_num (hum_tmpr.tmpr/10);
+
+                  hd44780_xy (14,2);
+                  hd44780_send (0x2C, DAT);
+                  hd44780_send ((hum_tmpr.hum%10)|0x30, DAT);
+                  hd44780_send (0x25, DAT);
+                  hd44780_xy (13,2);
+                  hd44780_num (hum_tmpr.hum/10);
+                }
             }
+            osSemaphoreRelease (hd44780_SemHandle);
         }
-        osSemaphoreRelease(hd44780_SemHandle);
+        HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
+        osDelay (1000);
     }
-    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
-    osDelay(1000);
-  }
-  /* USER CODE END 5 */ 
+    /* USER CODE END 5 */ 
 }
 
 /* StartTask_RTC_print function */
 void StartTask_RTC_print(void const * argument)
 {
-  /* USER CODE BEGIN StartTask_RTC_print */
-  
-  uint8_t DATE[11];
-  uint8_t TIME[9];
+    /* USER CODE BEGIN StartTask_RTC_print */
 
-  /* Infinite loop */
-  for(;;)
-  {
-    RTC_HandleTypeDef hrtc;
-    RTC_TimeTypeDef sTime;
-    RTC_DateTypeDef sDate;
-    hrtc.Instance = RTC;
+    uint8_t DATE [11];
+    uint8_t TIME [9];
 
-    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+    /* Infinite loop */
+    for(;;) {
+        RTC_HandleTypeDef hrtc;
+        RTC_TimeTypeDef sTime;
+        RTC_DateTypeDef sDate;
+        hrtc.Instance = RTC;
 
-    DATE[0] = (sDate.Date/10)|0x30;
-    DATE[1] = (sDate.Date%10)|0x30;
-    DATE[2] = 0x2F;                       // Symbol "/"
-    DATE[3] = (sDate.Month/10)|0x30;
-    DATE[4] = (sDate.Month%10)|0x30;
-    DATE[5] = 0x2F;                       // Symbol "/"
-    DATE[6] = 0x32;                       // Symbol "2"
-    DATE[7] = 0x30;                       // Symbol "0"
-    DATE[8] = (sDate.Year/10)|0x30;
-    DATE[9] = (sDate.Year%10)|0x30;
-    DATE[10] = 0;
+        HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+        HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
 
-    TIME[0] = (sTime.Hours/10)|0x30;
-    TIME[1] = (sTime.Hours%10)|0x30;
-    TIME[2] = 0x3A;                       // Symbol ":"
-    TIME[3] = (sTime.Minutes/10)|0x30;
-    TIME[4] = (sTime.Minutes%10)|0x30;
-    TIME[5] = 0x3A;                       // Symbol ":"
-    TIME[6] = (sTime.Seconds/10)|0x30;
-    TIME[7] = (sTime.Seconds%10)|0x30;
-    TIME[8] = 0;
+        DATE [0] = (sDate.Date/10)|0x30;
+        DATE [1] = (sDate.Date%10)|0x30;
+        DATE [2] = 0x2F;                       // Symbol "/"
+        DATE [3] = (sDate.Month/10)|0x30;
+        DATE [4] = (sDate.Month%10)|0x30;
+        DATE [5] = 0x2F;                       // Symbol "/"
+        DATE [6] = 0x32;                       // Symbol "2"
+        DATE [7] = 0x30;                       // Symbol "0"
+        DATE [8] = (sDate.Year/10)|0x30;
+        DATE [9] = (sDate.Year%10)|0x30;
+        DATE [10] = 0;
 
-    if (hd44780_SemHandle != NULL) {
-        if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
-            hd44780_xy(1, 1);
-            hd44780_string (TIME, 0);
-            hd44780_xy(1, 2);
-            hd44780_string (DATE, 0);
+        TIME [0] = (sTime.Hours/10)|0x30;
+        TIME [1] = (sTime.Hours%10)|0x30;
+        TIME [2] = 0x3A;                       // Symbol ":"
+        TIME [3] = (sTime.Minutes/10)|0x30;
+        TIME [4] = (sTime.Minutes%10)|0x30;
+        TIME [5] = 0x3A;                       // Symbol ":"
+        TIME [6] = (sTime.Seconds/10)|0x30;
+        TIME [7] = (sTime.Seconds%10)|0x30;
+        TIME [8] = 0;
+
+        if (hd44780_SemHandle != NULL) {
+            if(osSemaphoreWait(hd44780_SemHandle , 5) == osOK) {
+                hd44780_xy(1, 1);
+                hd44780_string (TIME, 0);
+                hd44780_xy(1, 2);
+                hd44780_string (DATE, 0);
+            }
+            osSemaphoreRelease(hd44780_SemHandle);
         }
-        osSemaphoreRelease(hd44780_SemHandle);
-    }
 
-    HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_9);
-    osDelay(50);
-  }
-  /* USER CODE END StartTask_RTC_print */
+        HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_9);
+        osDelay(50);
+    }
+    /* USER CODE END StartTask_RTC_print */
 }
 
 /* StartTask_RTC_set function */
 void StartTask_RTC_set(void const * argument)
 {
-  /* USER CODE BEGIN StartTask_RTC_set */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartTask_RTC_set */
+    /* USER CODE BEGIN StartTask_RTC_set */
+  
+    uint8_t DATE [11];
+    uint8_t TIME [9];
+    uint8_t i = 1;
+    uint8_t key;
+  
+    /* Infinite loop */
+    for(;;) {
+        switch (clock_state) {
+        case (RUN):
+            osDelay (100);
+            break;
+        case (GET_TIME):
+            osThreadSuspend (Task_RTC_printHandle);
+            osThreadSuspend (Task_am2302Handle);
+            
+            RTC_HandleTypeDef hrtc;
+            RTC_TimeTypeDef sTime;
+            RTC_DateTypeDef sDate;
+            hrtc.Instance = RTC;
+
+            HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+            HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
+            
+            DATE [0] = (sDate.Date/10)|0x30;
+            DATE [1] = (sDate.Date%10)|0x30;
+            DATE [2] = 0x2F;                       // Symbol "/"
+            DATE [3] = (sDate.Month/10)|0x30;
+            DATE [4] = (sDate.Month%10)|0x30;
+            DATE [5] = 0x2F;                       // Symbol "/"
+            DATE [6] = 0x32;                       // Symbol "2"
+            DATE [7] = 0x30;                       // Symbol "0"
+            DATE [8] = (sDate.Year/10)|0x30;
+            DATE [9] = (sDate.Year%10)|0x30;
+            DATE [10] = 0;
+
+            TIME [0] = (sTime.Hours/10)|0x30;
+            TIME [1] = (sTime.Hours%10)|0x30;
+            TIME [2] = 0x3A;                       // Symbol ":"
+            TIME [3] = (sTime.Minutes/10)|0x30;
+            TIME [4] = (sTime.Minutes%10)|0x30;
+            TIME [5] = 0x3A;                       // Symbol ":"
+            TIME [6] = (sTime.Seconds/10)|0x30;
+            TIME [7] = (sTime.Seconds%10)|0x30;
+            TIME [8] = 0;
+            
+            hd44780_xy(1, 1);
+            hd44780_string (TIME, 0);
+            hd44780_xy(1, 2);
+            hd44780_string (DATE, 0);
+            hd44780_xy (1,1);
+            hd44780_conf (DISPLAY_ON, CURSOR_OFF, BLINK_ON);
+            
+            clock_state = SET_TIME;
+            break;
+        case (SET_TIME):
+            key = keyboard_get_key ();
+            if (key < 10) {         // Pressed 0...9
+                TIME [i - 1] = key|0x30;
+                hd44780_send (key|0x30, DAT);
+                i++;
+            } else if (key == 14) { // Pressed "*" <--
+                i--;
+                hd44780_xy (i, 1);
+                if ((i == 3) || (i == 6)) {
+                    i--;
+                    hd44780_xy (i, 1);
+                } else if (i == 0) {
+                    i = 18;
+                    hd44780_xy (i - 8, 2);
+                    clock_state = SET_DATE;
+                }
+            } else if (key == 15) { // Pressed "#" -->
+                i++;
+                hd44780_xy (i, 1);
+            } else if (key == 13) { // Pressed "D" Enter
+                hd44780_conf (DISPLAY_ON, CURSOR_OFF, BLINK_OFF);
+                clock_state = WRITE_RTC;
+            }
+            
+            if ((i == 3) || (i == 6)) {
+                i++;
+                hd44780_xy (i, 1);
+            }
+            if (i == 9) {
+                hd44780_xy (i - 8, 2);
+                clock_state = SET_DATE;
+            }
+            break;
+        case (SET_DATE):
+            key = keyboard_get_key ();
+            if (key < 10) {
+                DATE [i - 9] = key|0x30;
+                hd44780_send (key|0x30, DAT);
+                i++;
+            } else if (key == 14) { // Pressed "*" <--
+                i--;
+                hd44780_xy (i - 8, 2);
+                if ((i == 11) || (i == 14)) {
+                    i--;
+                    hd44780_xy (i - 8, 2);
+                } else if (i == 8) {
+                    hd44780_xy (i, 1);
+                    clock_state = SET_TIME;
+                }
+            } else if (key == 15) { // Pressed "#" -->
+                i++;
+                hd44780_xy (i - 8, 2);
+            } else if (key == 13) { // Pressed "D" Enter
+                hd44780_conf (DISPLAY_ON, CURSOR_OFF, BLINK_OFF);
+                clock_state = WRITE_RTC;
+            }
+            if ((i == 11) || (i == 14)) {
+                i++;
+                hd44780_xy (i - 8, 2);
+            }
+            if (i == 19) {
+                i = 1;
+                hd44780_xy (i, 1);
+                clock_state = SET_TIME;
+            }
+            break;
+        case (WRITE_RTC):
+            sDate.Date = ((DATE[0]&0x0F)*10+(DATE[1]&0x0F));
+            sDate.Month = ((DATE[3]&0x0F)*10+(DATE[4]&0x0F));
+            sDate.Year = ((DATE[8]&0x0F)*10+(DATE[9]&0x0F));
+
+            sTime.Hours = ((TIME[0]&0x0F)*10+(TIME[1]&0x0F));
+            sTime.Minutes = ((TIME[3]&0x0F)*10+(TIME[4]&0x0F));
+            sTime.Seconds = ((TIME[6]&0x0F)*10+(TIME[7]&0x0F));
+
+            HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+            HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+            
+            clock_state = RUN;
+            hd44780_clr ();
+            osThreadResume (Task_RTC_printHandle);
+            osThreadResume (Task_am2302Handle);
+            break;
+        }
+      osDelay (100);
+    }
+    /* USER CODE END StartTask_RTC_set */
 }
 
 /**

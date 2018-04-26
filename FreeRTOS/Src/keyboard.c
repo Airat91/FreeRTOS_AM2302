@@ -33,7 +33,7 @@ void keyboard_init () {
     HAL_GPIO_Init (PORT_LIN4, &GPIO_InitStruct);
     
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     
     GPIO_InitStruct.Pin = STB1;
     HAL_GPIO_Init (PORT_STB1, &GPIO_InitStruct);
