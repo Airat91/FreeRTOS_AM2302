@@ -199,7 +199,7 @@ extern "C" {
 #endif
 
 #ifndef INCLUDE_eTaskGetState
-	#define INCLUDE_eTaskGetState 1
+	#define INCLUDE_eTaskGetState 0
 #endif
 
 #ifndef INCLUDE_xTaskResumeFromISR

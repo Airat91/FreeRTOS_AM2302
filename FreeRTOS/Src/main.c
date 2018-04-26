@@ -156,9 +156,7 @@ int main(void)
   
   am2302_init ();
   keyboard_init ();
-  
   hd44780_clr ();
-//  hd44780_string ();
  
   /* USER CODE END 2 */
 
@@ -181,7 +179,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of Task_am2302 */
-  osThreadDef(Task_am2302, StartTask_am2302, osPriorityHigh, 0, 128);
+  osThreadDef(Task_am2302, StartTask_am2302, osPriorityNormal, 0, 128);
   Task_am2302Handle = osThreadCreate(osThread(Task_am2302), NULL);
 
   /* definition and creation of Task_RTC_print */
@@ -487,18 +485,8 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : AM2302_PIN_Pin */
   GPIO_InitStruct.Pin = AM2302_PIN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(AM2302_PIN_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Button_Pin */
-  GPIO_InitStruct.Pin = Button_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
 }
 
@@ -510,7 +498,7 @@ static void MX_GPIO_Init(void)
 void StartTask_am2302(void const * argument)
 {
 
-    /* USER CODE BEGIN 5 */
+  /* USER CODE BEGIN 5 */
 
     am2302_data hum_tmpr;
     hum_tmpr.hum = 0;
@@ -518,7 +506,7 @@ void StartTask_am2302(void const * argument)
     hum_tmpr.paritet = 0;
 
     /* Infinite loop */
-    for(;;) {  
+    for(;;) {    
         hum_tmpr = am2302_get ();
         if (hd44780_SemHandle != NULL) {
             if (osSemaphoreWait (hd44780_SemHandle , 5) == osOK) {
@@ -549,13 +537,13 @@ void StartTask_am2302(void const * argument)
         HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_8);
         osDelay (1000);
     }
-    /* USER CODE END 5 */ 
+  /* USER CODE END 5 */ 
 }
 
 /* StartTask_RTC_print function */
 void StartTask_RTC_print(void const * argument)
 {
-    /* USER CODE BEGIN StartTask_RTC_print */
+  /* USER CODE BEGIN StartTask_RTC_print */
 
     uint8_t DATE [11];
     uint8_t TIME [9];
@@ -603,15 +591,15 @@ void StartTask_RTC_print(void const * argument)
         }
 
         HAL_GPIO_TogglePin (GPIOE, GPIO_PIN_9);
-        osDelay(50);
+        osDelay (50);
     }
-    /* USER CODE END StartTask_RTC_print */
+  /* USER CODE END StartTask_RTC_print */
 }
 
 /* StartTask_RTC_set function */
 void StartTask_RTC_set(void const * argument)
 {
-    /* USER CODE BEGIN StartTask_RTC_set */
+  /* USER CODE BEGIN StartTask_RTC_set */
   
     uint8_t DATE [11];
     uint8_t TIME [9];
@@ -622,7 +610,10 @@ void StartTask_RTC_set(void const * argument)
     for(;;) {
         switch (clock_state) {
         case (RUN):
-            osDelay (100);
+            key = keyboard_get_key ();
+            if (key == 13) {     // Pressed "D" Enter
+                clock_state = GET_TIME;
+            }
             break;
         case (GET_TIME):
             osThreadSuspend (Task_RTC_printHandle);
@@ -754,7 +745,7 @@ void StartTask_RTC_set(void const * argument)
         }
       osDelay (100);
     }
-    /* USER CODE END StartTask_RTC_set */
+  /* USER CODE END StartTask_RTC_set */
 }
 
 /**

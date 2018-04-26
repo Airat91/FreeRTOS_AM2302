@@ -1,7 +1,7 @@
 #include "am2302.h"
 
-#define AM2302_PIN  GPIO_PIN_13
-#define AM2302_PORT GPIOC
+#define AM2302_PIN  GPIO_PIN_6
+#define AM2302_PORT GPIOE
 #define AM2302_TIMER TIM6
 
 const uint32_t AM2302_TIMER_CLK = 72000000;
@@ -30,9 +30,9 @@ void am2302_init (void) {
   
     TIM_HandleTypeDef htim;
     htim.Instance = AM2302_TIMER;
-    htim.Init.Prescaler = (AM2302_TIMER_CLK / 20000000 - 1); //  2 MHz
+    htim.Init.Prescaler = (AM2302_TIMER_CLK / 2000000 - 1); //  2 MHz
     htim.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim.Init.Period = 20000;                                // timeout = 1 ms
+    htim.Init.Period = 2000;                                // timeout = 1 ms
     htim.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim.Init.RepetitionCounter = 0;
     htim.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -53,15 +53,6 @@ am2302_data am2302_get (void) {
     
     TIM_HandleTypeDef htim;
     htim.Instance = AM2302_TIMER;
-//    htim.Init.Prescaler = (AM2302_TIMER_CLK / 20000000 - 1); //  2 MHz
-//    htim.Init.CounterMode = TIM_COUNTERMODE_UP;
-//    htim.Init.Period = 20000;                                // timeout = 1 ms
-//    htim.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-//    htim.Init.RepetitionCounter = 0;
-//    htim.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-//    if (HAL_TIM_Base_Init(&htim) != HAL_OK) {
-//        _Error_Handler(__FILE__, __LINE__);
-//    }
     
     GPIO_InitTypeDef GPIO_InitStruct;                   // AM2032_PIN to OUT
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
